@@ -1,9 +1,8 @@
-"""Platform abstraction + registry.
+"""Platform abstraction and registry.
 
-Every competitive-programming site we support is a `Platform`. The rest of the
-codebase only ever talks to this interface, so adding a new site (Codeforces,
-HackerRank, ...) means writing one module that subclasses `Platform` and calls
-`@register_platform` — nothing else needs to change.
+Each supported site is a Platform. The rest of the application depends only on
+this interface, never on a concrete site, so adding a new platform means adding
+one module that subclasses Platform and registers itself.
 """
 
 from __future__ import annotations
@@ -21,28 +20,27 @@ class PlatformStats:
     username: str
     current_streak: int
     total_solved: int
-    # Anything platform-specific (e.g. per-difficulty breakdown). Kept loose
-    # on purpose so platforms can expose extra detail without schema churn.
+    # Optional platform-specific fields, kept loose so platforms can expose
+    # extra detail without changing this schema.
     extra: dict = field(default_factory=dict)
 
 
 @dataclass
 class Challenge:
-    """A single problem to throw at the group."""
+    """A single problem to post to the group."""
 
     platform: str
     title: str
     url: str
     difficulty: str
-    extra: dict = field(default_factory=dict)
 
 
 class Platform(ABC):
     """Base class for all platform integrations.
 
     Subclasses set a unique ``name`` (used as the env-var suffix and storage
-    key) and implement ``fetch_stats``. Challenge support is optional: flip
-    ``supports_challenges`` and implement ``random_challenge``.
+    key) and implement ``fetch_stats``. Challenge support is optional: set
+    ``supports_challenges`` to True and implement ``random_challenge``.
     """
 
     name: str = "base"
@@ -51,22 +49,17 @@ class Platform(ABC):
 
     @abstractmethod
     async def fetch_stats(self, username: str) -> PlatformStats:
-        """Return the current streak + totals for ``username``.
+        """Return current streak and totals for ``username``.
 
-        Should raise on network/lookup failure so callers can degrade
-        gracefully per-user instead of crashing the whole run.
+        Should raise on lookup or network failure so callers can degrade
+        gracefully per user rather than failing the whole run.
         """
-        raise NotImplementedError
 
     async def random_challenge(
         self, difficulties: Sequence[str] = ("Medium", "Hard")
     ) -> Challenge:
-        raise NotImplementedError(
-            f"{self.display_name} does not support challenges"
-        )
+        raise NotImplementedError(f"{self.display_name} does not support challenges")
 
-
-# --- registry -------------------------------------------------------------
 
 _REGISTRY: dict[str, Platform] = {}
 

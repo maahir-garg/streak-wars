@@ -71,7 +71,6 @@ def build_application(config: Config) -> Application:
     app.add_handler(CommandHandler("streak", commands.streak_command))
     app.add_handler(CommandHandler("leaderboard", commands.leaderboard_command))
     app.add_handler(CommandHandler("challenge", commands.challenge_command))
-    app.add_handler(CommandHandler("id", commands.id_command))
 
     app.job_queue.run_daily(daily_summary_job, time=config.daily_summary_time)
     app.job_queue.run_repeating(

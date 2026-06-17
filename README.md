@@ -11,10 +11,17 @@ added without changing the rest of the application.
 ## Features
 
 - Daily summary posted to a group chat showing every participant's streak and
-  total solved, plus a random medium or hard problem.
+  total solved, alongside LeetCode's official daily challenge.
 - Streak-break announcements when a participant's streak drops to zero.
-- `/streak` shows current streaks for all participants.
+- Milestone announcements when a streak reaches 7, 14, 30, 50, 100, 365 days
+  and beyond.
+- Personal-record announcements when an ended streak was a participant's
+  longest ever.
+- Evening reminders for anyone whose streak has no activity yet that day.
+- Weekly recap of problems solved, naming a winner.
+- `/streak` shows current streaks and difficulty breakdown for all participants.
 - `/leaderboard` shows streaks, totals, and who is leading.
+- `/records` shows each participant's longest-ever streak.
 - `/challenge` posts a random medium or hard LeetCode problem.
 - Commands are restricted to registered participants.
 
@@ -61,7 +68,10 @@ All configuration is read from `.env`. No code changes are required.
 | `GROUP_CHAT_ID` | Chat that receives the daily summary and announcements. |
 | `TIMEZONE` | IANA timezone name, for example `Asia/Singapore`. |
 | `DAILY_SUMMARY_TIME` | Time of the daily summary, 24h `HH:MM`, in `TIMEZONE`. |
-| `STREAK_CHECK_INTERVAL_MINUTES` | How often to check for broken streaks. |
+| `STREAK_CHECK_INTERVAL_MINUTES` | How often to check for breaks, milestones, and records. |
+| `REMINDER_TIME` | Evening reminder time, 24h `HH:MM`. Set to `off` to disable. |
+| `WEEKLY_RECAP_DAY` | Day of the weekly recap, `sun` through `sat`. |
+| `WEEKLY_RECAP_TIME` | Time of the weekly recap, 24h `HH:MM`. Set to `off` to disable. |
 | `USER{n}_NAME` | Display name of participant `n`. |
 | `USER{n}_TELEGRAM_ID` | Telegram user id of participant `n` (controls command access). |
 | `USER{n}_LEETCODE` | LeetCode username of participant `n`. |
@@ -90,8 +100,9 @@ The application depends only on the `Platform` interface in
 
 1. Create a module in `bot/platforms/`.
 2. Subclass `Platform`, set `name` and `display_name`, and implement
-   `fetch_stats`. Optionally implement `random_challenge` and set
-   `supports_challenges = True`.
+   `fetch_stats`. Optionally implement `random_challenge` (set
+   `supports_challenges = True`) and `daily_challenge` (set
+   `supports_daily = True`).
 3. Decorate the class with `@register_platform`.
 4. Import the module in `bot/platforms/__init__.py`.
 5. Add `USER{n}_{PLATFORM}` handles to `.env`.
@@ -105,15 +116,15 @@ changes. `bot/platforms/leetcode.py` is a complete example.
 bot/
   main.py            Entry point: builds the app, registers handlers and jobs.
   config.py          Loads .env into typed configuration objects.
-  models.py          Data classes: User, BreakEvent.
-  storage.py         SQLite persistence of last-known streaks.
-  messages.py        Message formatting.
+  models.py          Data classes: User, BreakEvent, MilestoneEvent, RecordEvent.
+  storage.py         SQLite persistence of streak, best streak, and weekly baseline.
+  messages.py        Message formatting and taunts.
   platforms/
     base.py          Platform interface and registry.
     leetcode.py      LeetCode implementation.
   services/
-    tracker.py       Fetches stats and detects breaks.
-    challenge.py     Selects a random challenge.
+    tracker.py       Fetches stats; detects breaks, milestones, and records; weekly recap.
+    challenge.py     Selects random and daily challenges.
   handlers/
     commands.py      Command handlers and access control.
 ```

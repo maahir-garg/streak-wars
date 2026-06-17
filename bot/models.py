@@ -20,8 +20,27 @@ class User:
 
 @dataclass
 class BreakEvent:
-    """Emitted when a user's streak on a platform drops to zero."""
+    """A user's streak on a platform dropped to zero."""
 
     user: User
     platform: str
     previous_streak: int
+
+
+@dataclass
+class MilestoneEvent:
+    """A user's streak reached a celebrated threshold (7, 30, 100, ...)."""
+
+    user: User
+    platform: str
+    streak: int
+    milestone: int
+
+
+@dataclass
+class RecordEvent:
+    """A just-ended streak was the user's longest ever on a platform."""
+
+    user: User
+    platform: str
+    streak: int

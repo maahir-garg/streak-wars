@@ -20,6 +20,12 @@ class PlatformStats:
     username: str
     current_streak: int
     total_solved: int
+    # Whether the user was active today (used for streak-saving reminders).
+    solved_today: bool = False
+    # Solved counts by difficulty, where the platform exposes them.
+    easy: int = 0
+    medium: int = 0
+    hard: int = 0
     # Optional platform-specific fields, kept loose so platforms can expose
     # extra detail without changing this schema.
     extra: dict = field(default_factory=dict)
@@ -39,13 +45,16 @@ class Platform(ABC):
     """Base class for all platform integrations.
 
     Subclasses set a unique ``name`` (used as the env-var suffix and storage
-    key) and implement ``fetch_stats``. Challenge support is optional: set
-    ``supports_challenges`` to True and implement ``random_challenge``.
+    key) and implement ``fetch_stats``. Two optional capabilities can be added
+    by setting the matching flag and implementing the method:
+    ``supports_challenges`` / ``random_challenge`` and ``supports_daily`` /
+    ``daily_challenge``.
     """
 
     name: str = "base"
     display_name: str = "Base"
     supports_challenges: bool = False
+    supports_daily: bool = False
 
     @abstractmethod
     async def fetch_stats(self, username: str) -> PlatformStats:
@@ -59,6 +68,11 @@ class Platform(ABC):
         self, difficulties: Sequence[str] = ("Medium", "Hard")
     ) -> Challenge:
         raise NotImplementedError(f"{self.display_name} does not support challenges")
+
+    async def daily_challenge(self) -> Challenge:
+        raise NotImplementedError(
+            f"{self.display_name} does not have a daily challenge"
+        )
 
 
 _REGISTRY: dict[str, Platform] = {}
@@ -81,3 +95,7 @@ def all_platform_names() -> list[str]:
 
 def challenge_platforms() -> list[Platform]:
     return [p for p in _REGISTRY.values() if p.supports_challenges]
+
+
+def daily_platforms() -> list[Platform]:
+    return [p for p in _REGISTRY.values() if p.supports_daily]

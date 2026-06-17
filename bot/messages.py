@@ -9,15 +9,21 @@ from __future__ import annotations
 import random
 from html import escape
 
-from .models import BreakEvent
+from .models import BreakEvent, MilestoneEvent, RecordEvent
 from .platforms import Challenge, PlatformStats, get_platform
-from .services.tracker import Snapshot
+from .services.tracker import RiskItem, Snapshot, WeeklyResult
 
 _TAUNTS = [
     "{name} let a {n}-day {platform} streak die. Back to zero.",
     "{name}'s {n}-day {platform} streak is over. The grind continues without them.",
     "Streak broken: {name} dropped a {n}-day run on {platform}.",
     "{name} missed a day. {n} days of {platform} progress, gone.",
+]
+
+_MILESTONES = [
+    "{name} just hit a {m}-day {platform} streak. Keep it going.",
+    "Milestone: {name} reached {m} days on {platform}.",
+    "{m} days and counting. {name} is on a {platform} tear.",
 ]
 
 
@@ -32,10 +38,22 @@ def _plural(n: int, word: str) -> str:
     return f"{n} {word}" + ("" if n == 1 else "s")
 
 
+def _mention(telegram_id: int, name: str) -> str:
+    safe = escape(name)
+    # A real user id produces a tap-to-ping mention; placeholder ids (e.g. 0)
+    # simply render as bold text.
+    if telegram_id > 0:
+        return f'<a href="tg://user?id={telegram_id}">{safe}</a>'
+    return f"<b>{safe}</b>"
+
+
 def _stats_line(stats: PlatformStats | None) -> str:
     if stats is None:
         return "stats unavailable"
-    return f"{stats.current_streak}-day streak, {stats.total_solved} solved"
+    return (
+        f"{stats.current_streak}-day streak, {stats.total_solved} solved "
+        f"({stats.easy}E / {stats.medium}M / {stats.hard}H)"
+    )
 
 
 def _total_streak(snapshot: Snapshot) -> int:
@@ -79,11 +97,29 @@ def format_leaderboard(snapshots: list[Snapshot]) -> str:
     return "\n".join(lines).strip()
 
 
-def format_challenge(challenge: Challenge) -> str:
+def format_records(snapshots: list[Snapshot], storage) -> str:
+    """Best-ever streak per participant (longest completed or current run)."""
+    lines = ["<b>Personal records</b>", ""]
+    rows = []
+    for snap in snapshots:
+        best = 0
+        for platform_name, stats in snap.stats.items():
+            state = storage.get_state(snap.user.telegram_id, platform_name)
+            stored_best = state.best_streak if state else 0
+            current = stats.current_streak if stats else 0
+            best = max(best, stored_best, current)
+        rows.append((snap.user.name, best))
+    rows.sort(key=lambda r: r[1], reverse=True)
+    for name, best in rows:
+        lines.append(f"<b>{escape(name)}</b>: best {_plural(best, 'day')}")
+    return "\n".join(lines).strip()
+
+
+def format_challenge(challenge: Challenge, heading: str = "Challenge") -> str:
     title = escape(challenge.title)
     url = escape(challenge.url, quote=True)
     return (
-        "<b>Challenge</b>\n\n"
+        f"<b>{escape(heading)}</b>\n\n"
         f'<a href="{url}">{title}</a>\n'
         f"Difficulty: {escape(challenge.difficulty)} "
         f"({escape(_platform_label(challenge.platform))})"
@@ -96,6 +132,62 @@ def format_break(event: BreakEvent) -> str:
         platform=escape(_platform_label(event.platform)),
         n=event.previous_streak,
     )
+
+
+def format_milestone(event: MilestoneEvent) -> str:
+    return random.choice(_MILESTONES).format(
+        name=escape(event.user.name),
+        platform=escape(_platform_label(event.platform)),
+        m=event.milestone,
+    )
+
+
+def format_record(event: RecordEvent) -> str:
+    return (
+        f"That {event.streak}-day "
+        f"{escape(_platform_label(event.platform))} run was "
+        f"{escape(event.user.name)}'s longest ever. A new personal record."
+    )
+
+
+def format_event(event) -> str:
+    if isinstance(event, BreakEvent):
+        return format_break(event)
+    if isinstance(event, MilestoneEvent):
+        return format_milestone(event)
+    if isinstance(event, RecordEvent):
+        return format_record(event)
+    raise TypeError(f"Unknown event type: {type(event)!r}")
+
+
+def format_reminder(item: RiskItem) -> str:
+    mention = _mention(item.user.telegram_id, item.user.name)
+    platform = escape(_platform_label(item.platform))
+    return (
+        f"{mention}, your {item.stats.current_streak}-day {platform} streak is on "
+        "the line. Solve something today to keep it alive."
+    )
+
+
+def format_weekly_recap(results: list[WeeklyResult]) -> str:
+    lines = ["<b>Weekly recap</b>", "", "Problems solved this week:"]
+    for i, r in enumerate(results, start=1):
+        lines.append(
+            f"{i}. <b>{escape(r.user.name)}</b> - {r.solved_this_week} solved, "
+            f"{r.total_streak}-day streak"
+        )
+
+    lines.append("")
+    top = results[0] if results else None
+    if not top or top.solved_this_week == 0:
+        lines.append("Nobody solved anything this week. Step it up.")
+    elif len(results) >= 2 and results[1].solved_this_week == top.solved_this_week:
+        lines.append("It is a tie at the top this week.")
+    else:
+        lines.append(
+            f"Winner: {escape(top.user.name)} with {top.solved_this_week} solved."
+        )
+    return "\n".join(lines).strip()
 
 
 def format_daily_summary(snapshots: list[Snapshot]) -> str:

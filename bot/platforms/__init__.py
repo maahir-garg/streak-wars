@@ -12,6 +12,7 @@ from .base import (  # noqa: F401
     PlatformStats,
     all_platform_names,
     challenge_platforms,
+    daily_platforms,
     get_platform,
     register_platform,
 )

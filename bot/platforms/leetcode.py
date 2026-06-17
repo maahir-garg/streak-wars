@@ -16,6 +16,7 @@ from .base import Challenge, Platform, PlatformStats, register_platform
 
 GRAPHQL_URL = "https://leetcode.com/graphql"
 PROBLEMS_URL = "https://leetcode.com/api/problems/all/"
+SITE_URL = "https://leetcode.com"
 
 # LeetCode rejects requests without a browser-like User-Agent.
 _HEADERS = {
@@ -36,6 +37,15 @@ query combined($username: String!, $cur: Int!, $prev: Int!) {
     }
     cur: userCalendar(year: $cur) { submissionCalendar }
     prev: userCalendar(year: $prev) { submissionCalendar }
+  }
+}
+"""
+
+_DAILY_QUERY = """
+query daily {
+  activeDailyCodingChallengeQuestion {
+    link
+    question { title difficulty }
   }
 }
 """
@@ -81,6 +91,7 @@ class LeetCode(Platform):
     name = "leetcode"
     display_name = "LeetCode"
     supports_challenges = True
+    supports_daily = True
 
     async def fetch_stats(self, username: str) -> PlatformStats:
         today = datetime.now(timezone.utc).date()
@@ -101,20 +112,20 @@ class LeetCode(Platform):
             (user.get("cur") or {}).get("submissionCalendar"),
             (user.get("prev") or {}).get("submissionCalendar"),
         )
-        total = next(
-            (
-                row["count"]
-                for row in user["submitStatsGlobal"]["acSubmissionNum"]
-                if row["difficulty"] == "All"
-            ),
-            0,
-        )
+        by_difficulty = {
+            row["difficulty"]: row["count"]
+            for row in user["submitStatsGlobal"]["acSubmissionNum"]
+        }
 
         return PlatformStats(
             platform=self.name,
             username=username,
             current_streak=_current_streak(active, today),
-            total_solved=total,
+            total_solved=by_difficulty.get("All", 0),
+            solved_today=today in active,
+            easy=by_difficulty.get("Easy", 0),
+            medium=by_difficulty.get("Medium", 0),
+            hard=by_difficulty.get("Hard", 0),
         )
 
     async def random_challenge(self, difficulties=("Medium", "Hard")) -> Challenge:
@@ -139,6 +150,23 @@ class LeetCode(Platform):
         return Challenge(
             platform=self.name,
             title=stat["question__title"],
-            url=f"https://leetcode.com/problems/{slug}/",
+            url=f"{SITE_URL}/problems/{slug}/",
             difficulty=difficulty,
+        )
+
+    async def daily_challenge(self) -> Challenge:
+        async with httpx.AsyncClient(timeout=15, headers=_HEADERS) as client:
+            resp = await client.post(GRAPHQL_URL, json={"query": _DAILY_QUERY})
+            resp.raise_for_status()
+            payload = resp.json()
+
+        daily = (payload.get("data") or {}).get("activeDailyCodingChallengeQuestion")
+        if not daily:
+            raise ValueError("LeetCode daily challenge unavailable")
+
+        return Challenge(
+            platform=self.name,
+            title=daily["question"]["title"],
+            url=f"{SITE_URL}{daily['link']}",
+            difficulty=daily["question"]["difficulty"],
         )

@@ -9,7 +9,7 @@ from __future__ import annotations
 import random
 from html import escape
 
-from .models import BreakEvent, MilestoneEvent, RecordEvent
+from .models import BreakEvent, MilestoneEvent
 from .platforms import Challenge, PlatformStats, get_platform
 from .services.tracker import RiskItem, Snapshot, WeeklyResult
 
@@ -97,24 +97,6 @@ def format_leaderboard(snapshots: list[Snapshot]) -> str:
     return "\n".join(lines).strip()
 
 
-def format_records(snapshots: list[Snapshot], storage) -> str:
-    """Best-ever streak per participant (longest completed or current run)."""
-    lines = ["<b>Personal records</b>", ""]
-    rows = []
-    for snap in snapshots:
-        best = 0
-        for platform_name, stats in snap.stats.items():
-            state = storage.get_state(snap.user.telegram_id, platform_name)
-            stored_best = state.best_streak if state else 0
-            current = stats.current_streak if stats else 0
-            best = max(best, stored_best, current)
-        rows.append((snap.user.name, best))
-    rows.sort(key=lambda r: r[1], reverse=True)
-    for name, best in rows:
-        lines.append(f"<b>{escape(name)}</b>: best {_plural(best, 'day')}")
-    return "\n".join(lines).strip()
-
-
 def format_challenge(challenge: Challenge, heading: str = "Challenge") -> str:
     title = escape(challenge.title)
     url = escape(challenge.url, quote=True)
@@ -142,21 +124,11 @@ def format_milestone(event: MilestoneEvent) -> str:
     )
 
 
-def format_record(event: RecordEvent) -> str:
-    return (
-        f"That {event.streak}-day "
-        f"{escape(_platform_label(event.platform))} run was "
-        f"{escape(event.user.name)}'s longest ever. A new personal record."
-    )
-
-
 def format_event(event) -> str:
     if isinstance(event, BreakEvent):
         return format_break(event)
     if isinstance(event, MilestoneEvent):
         return format_milestone(event)
-    if isinstance(event, RecordEvent):
-        return format_record(event)
     raise TypeError(f"Unknown event type: {type(event)!r}")
 
 

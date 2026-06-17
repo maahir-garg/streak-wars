@@ -16,13 +16,11 @@ from .. import messages
 from ..config import Config
 from ..services.challenge import random_challenge
 from ..services.tracker import Tracker
-from ..storage import Storage
 
 _HELP_TEXT = (
     "Available commands:\n"
     "/streak - current streaks for all participants\n"
     "/leaderboard - standings and who is leading\n"
-    "/records - longest-ever streak for each participant\n"
     "/challenge - a random medium or hard problem"
 )
 
@@ -33,10 +31,6 @@ def _config(context: ContextTypes.DEFAULT_TYPE) -> Config:
 
 def _tracker(context: ContextTypes.DEFAULT_TYPE) -> Tracker:
     return context.application.bot_data["tracker"]
-
-
-def _storage(context: ContextTypes.DEFAULT_TYPE) -> Storage:
-    return context.application.bot_data["storage"]
 
 
 def restricted(func):
@@ -82,12 +76,6 @@ async def leaderboard_command(
 ) -> None:
     snapshots = await _tracker(context).snapshot()
     await _reply(update, messages.format_leaderboard(snapshots))
-
-
-@restricted
-async def records_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    snapshots = await _tracker(context).snapshot()
-    await _reply(update, messages.format_records(snapshots, _storage(context)))
 
 
 @restricted

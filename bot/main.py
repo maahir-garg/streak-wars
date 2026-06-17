@@ -48,7 +48,7 @@ async def daily_summary_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def poll_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Poll for breaks, milestones, and records, and announce them."""
+    """Poll for streak breaks and milestones, and announce them."""
     tracker: Tracker = context.application.bot_data["tracker"]
     for event in await tracker.poll():
         await _post(context, messages.format_event(event))
@@ -81,13 +81,11 @@ def build_application(config: Config) -> Application:
     app = Application.builder().token(config.bot_token).post_init(_post_init).build()
     app.bot_data["config"] = config
     app.bot_data["tracker"] = tracker
-    app.bot_data["storage"] = storage
 
     app.add_handler(CommandHandler("start", commands.start_command))
     app.add_handler(CommandHandler("help", commands.help_command))
     app.add_handler(CommandHandler("streak", commands.streak_command))
     app.add_handler(CommandHandler("leaderboard", commands.leaderboard_command))
-    app.add_handler(CommandHandler("records", commands.records_command))
     app.add_handler(CommandHandler("challenge", commands.challenge_command))
 
     jobs = app.job_queue

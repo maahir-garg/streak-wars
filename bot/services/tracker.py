@@ -9,14 +9,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..config import Config
-from ..models import BreakEvent, MilestoneEvent, RecordEvent, User
+from ..models import BreakEvent, MilestoneEvent, User
 from ..platforms import PlatformStats, get_platform
 from ..storage import Storage
 
 # Streak lengths worth celebrating.
 MILESTONES = (7, 14, 30, 50, 100, 150, 200, 250, 365, 500, 730, 1000)
 
-Event = BreakEvent | MilestoneEvent | RecordEvent
+Event = BreakEvent | MilestoneEvent
 
 
 @dataclass
@@ -76,7 +76,6 @@ class Tracker:
                 if stats is None:
                     continue
                 state = self.storage.get_state(snap.user.telegram_id, platform_name)
-                best = state.best_streak if state else 0
                 baseline = (
                     state.week_baseline_solved
                     if state and state.week_baseline_solved is not None
@@ -86,15 +85,14 @@ class Tracker:
                     snap.user.telegram_id,
                     platform_name,
                     stats.current_streak,
-                    best,
                     baseline,
                 )
 
     async def poll(self) -> list[Event]:
         """Fetch fresh stats, persist them, and return events worth announcing.
 
-        Detects streak breaks, milestone crossings, and personal records. Failed
-        fetches are skipped so known-good state is never overwritten.
+        Detects streak breaks and milestone crossings. Failed fetches are skipped
+        so known-good state is never overwritten.
         """
         events: list[Event] = []
         for snap in await self.snapshot():
@@ -106,12 +104,11 @@ class Tracker:
                 if state is None:
                     # Not seeded yet: store silently, no events.
                     self.storage.save_state(
-                        uid, platform_name, stats.current_streak, 0, stats.total_solved
+                        uid, platform_name, stats.current_streak, stats.total_solved
                     )
                     continue
 
                 prev = state.current_streak
-                best = state.best_streak
                 current = stats.current_streak
 
                 crossed = [m for m in MILESTONES if prev < m <= current]
@@ -119,21 +116,15 @@ class Tracker:
                     events.append(
                         MilestoneEvent(snap.user, platform_name, current, max(crossed))
                     )
-
                 if prev > 0 and current == 0:
                     events.append(BreakEvent(snap.user, platform_name, prev))
-                    if prev > best:
-                        events.append(RecordEvent(snap.user, platform_name, prev))
-                        best = prev
 
                 baseline = (
                     state.week_baseline_solved
                     if state.week_baseline_solved is not None
                     else stats.total_solved
                 )
-                self.storage.save_state(
-                    uid, platform_name, current, best, baseline
-                )
+                self.storage.save_state(uid, platform_name, current, baseline)
         return events
 
     async def at_risk(self) -> list[RiskItem]:
@@ -167,7 +158,6 @@ class Tracker:
                     uid,
                     platform_name,
                     state.current_streak if state else stats.current_streak,
-                    state.best_streak if state else 0,
                     stats.total_solved,  # reset baseline for the new week
                 )
             results.append(WeeklyResult(snap.user, solved, streak))

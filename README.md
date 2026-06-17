@@ -15,13 +15,10 @@ added without changing the rest of the application.
 - Streak-break announcements when a participant's streak drops to zero.
 - Milestone announcements when a streak reaches 7, 14, 30, 50, 100, 365 days
   and beyond.
-- Personal-record announcements when an ended streak was a participant's
-  longest ever.
 - Evening reminders for anyone whose streak has no activity yet that day.
 - Weekly recap of problems solved, naming a winner.
 - `/streak` shows current streaks and difficulty breakdown for all participants.
 - `/leaderboard` shows streaks, totals, and who is leading.
-- `/records` shows each participant's longest-ever streak.
 - `/challenge` posts a random medium or hard LeetCode problem.
 - Commands are restricted to registered participants.
 
@@ -68,7 +65,7 @@ All configuration is read from `.env`. No code changes are required.
 | `GROUP_CHAT_ID` | Chat that receives the daily summary and announcements. |
 | `TIMEZONE` | IANA timezone name, for example `Asia/Singapore`. |
 | `DAILY_SUMMARY_TIME` | Time of the daily summary, 24h `HH:MM`, in `TIMEZONE`. |
-| `STREAK_CHECK_INTERVAL_MINUTES` | How often to check for breaks, milestones, and records. |
+| `STREAK_CHECK_INTERVAL_MINUTES` | How often to check for breaks and milestones. |
 | `REMINDER_TIME` | Evening reminder time, 24h `HH:MM`. Set to `off` to disable. |
 | `WEEKLY_RECAP_DAY` | Day of the weekly recap, `sun` through `sat`. |
 | `WEEKLY_RECAP_TIME` | Time of the weekly recap, 24h `HH:MM`. Set to `off` to disable. |
@@ -116,14 +113,14 @@ changes. `bot/platforms/leetcode.py` is a complete example.
 bot/
   main.py            Entry point: builds the app, registers handlers and jobs.
   config.py          Loads .env into typed configuration objects.
-  models.py          Data classes: User, BreakEvent, MilestoneEvent, RecordEvent.
-  storage.py         SQLite persistence of streak, best streak, and weekly baseline.
+  models.py          Data classes: User, BreakEvent, MilestoneEvent.
+  storage.py         SQLite persistence of current streak and weekly baseline.
   messages.py        Message formatting and taunts.
   platforms/
     base.py          Platform interface and registry.
     leetcode.py      LeetCode implementation.
   services/
-    tracker.py       Fetches stats; detects breaks, milestones, and records; weekly recap.
+    tracker.py       Fetches stats; detects breaks and milestones; weekly recap.
     challenge.py     Selects random and daily challenges.
   handlers/
     commands.py      Command handlers and access control.

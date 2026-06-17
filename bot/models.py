@@ -35,12 +35,3 @@ class MilestoneEvent:
     platform: str
     streak: int
     milestone: int
-
-
-@dataclass
-class RecordEvent:
-    """A just-ended streak was the user's longest ever on a platform."""
-
-    user: User
-    platform: str
-    streak: int

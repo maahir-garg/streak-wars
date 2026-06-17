@@ -1,4 +1,4 @@
-# Competition Tracker Bot
+# Streak Wars
 
 A private Telegram bot for tracking a friendly coding competition between a
 group of participants. It tracks LeetCode streaks, posts a daily summary, and

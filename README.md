@@ -8,18 +8,26 @@ The platform layer is pluggable: LeetCode is one module implementing a shared
 interface, so support for other sites (Codeforces, HackerRank, and so on) can be
 added without changing the rest of the application.
 
-## Features
+## Status
+
+A personal project, written in June 2026 for a small friend group. It is run by
+hand on one machine, has no automated tests, and has no hosted instance.
+
+## What it does
 
 - Daily summary posted to a group chat showing every participant's streak and
   total solved, alongside LeetCode's official daily challenge.
 - Streak-break announcements when a participant's streak drops to zero.
-- Milestone announcements when a streak reaches 7, 14, 30, 50, 100, 365 days
-  and beyond.
+- Milestone announcements when a streak reaches 7, 14, 30, 50, 100, 150, 200,
+  250, 365, 500, 730 or 1000 days.
 - Evening reminders for anyone whose streak has no activity yet that day.
 - Weekly recap of problems solved, naming a winner.
-- `/streak` shows current streaks and difficulty breakdown for all participants.
-- `/leaderboard` shows streaks, totals, and who is leading.
-- `/challenge` posts a random medium or hard LeetCode problem.
+- `/streak` shows current streaks, total solved and the easy, medium and hard
+  breakdown for all participants.
+- `/leaderboard` ranks participants by current streak, shows total solved, and
+  states who leads and by how many days.
+- `/challenge` posts a random free medium or hard LeetCode problem.
+- `/start` and `/help` list the commands.
 - Commands are restricted to registered participants.
 
 ## Requirements
@@ -78,6 +86,21 @@ supported; the bot loads every consecutive `USER{n}` block that defines a name
 and Telegram id. A participant's streak is tracked from their platform handle
 alone, so their Telegram id is only required for issuing commands.
 
+## Usage
+
+Send these commands to the bot from a registered participant's account:
+
+| Command | Result |
+| --- | --- |
+| `/start`, `/help` | Lists the commands. |
+| `/streak` | Current streak, total solved and difficulty counts per participant. |
+| `/leaderboard` | Participants ranked by current streak. |
+| `/challenge` | A random medium or hard LeetCode problem. |
+
+The daily summary, streak-break and milestone announcements, reminders and
+weekly recap are posted to `GROUP_CHAT_ID` on the schedule set in `.env`. They
+do not need a command.
+
 ## Running
 
 While `python -m bot.main` is running the bot is online and responds to
@@ -107,6 +130,22 @@ The application depends only on the `Platform` interface in
 The tracker, scheduler, leaderboard, break detection, and storage require no
 changes. `bot/platforms/leetcode.py` is a complete example.
 
+## How it works
+
+On startup the bot records each participant's current streak without
+announcing anything, so a stale break is not reported on the first poll. After
+that a repeating job fetches fresh stats, compares the streak with the stored
+value, and announces a break (streak fell from above zero to zero) or a
+milestone crossing. The reminder job posts for anyone with a live streak and no
+activity in the submission calendar yet today. The weekly recap compares total solved with the
+count stored at the previous recap, then resets that count.
+
+LeetCode streaks are computed in `bot/platforms/leetcode.py` from the public
+submission calendar for the current and previous calendar year. A streak counts
+consecutive days with at least one entry in that calendar, ending today or, if today has
+none yet, yesterday. SQLite (`data/competition.db`, created on first run) holds
+only the last seen streak and the weekly baseline for each participant.
+
 ## Project structure
 
 ```
@@ -125,6 +164,21 @@ bot/
   handlers/
     commands.py      Command handlers and access control.
 ```
+
+## Limitations
+
+- Stats come from LeetCode's public, undocumented GraphQL and problems
+  endpoints, with a browser-like User-Agent. They are not an official API and
+  can change or rate-limit without notice. A failed fetch shows as "stats
+  unavailable" and is skipped when checking for breaks.
+- Streak days are calendar days in UTC, not in `TIMEZONE`. `TIMEZONE` only sets
+  when the scheduled posts fire, so a day can roll over at a different local
+  hour than the schedule suggests.
+- Only LeetCode is implemented. The weekly recap and break detection assume one
+  process running continuously; no catch-up happens for time the bot was off.
+- Only the streak and weekly baseline are stored. Past streaks and personal
+  bests are not tracked.
+- There are no automated tests.
 
 ## Troubleshooting
 
